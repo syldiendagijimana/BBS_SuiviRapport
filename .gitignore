@@ -1,0 +1,18 @@
+﻿# Node.js
+node_modules/
+backend/node_modules/
+mobile/node_modules/
+
+# Android
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+
+# Uploads
+backend/uploads/messages/
+
+# APK
+*.apk
+
+# Logs
+*.log

@@ -1,4 +1,3 @@
-// routes/auth.js
 const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
@@ -6,12 +5,16 @@ const jwt = require('jsonwebtoken');
 const { getDb } = require('../db/database');
 const { authenticate, SECRET } = require('../middleware/auth');
 
-// POST /api/auth/login
+
+// ======================
+// LOGIN
+// ======================
 router.post('/login', (req, res) => {
   try {
-    console.log("LOGIN BODY:", req.body);
+    console.log("➡️ LOGIN BODY:", req.body);
 
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim();
+    const password = String(req.body.password || '').trim();
 
     if (!email || !password) {
       return res.status(400).json({
@@ -20,7 +23,9 @@ router.post('/login', (req, res) => {
       });
     }
 
-    const user = getDb()
+    const db = getDb();
+
+    const user = db
       .prepare('SELECT * FROM users WHERE email = ?')
       .get(email);
 
@@ -31,7 +36,7 @@ router.post('/login', (req, res) => {
       });
     }
 
-    if (!user.actif) {
+    if (user.actif === 0) {
       return res.status(403).json({
         success: false,
         message: "Compte désactivé"
@@ -48,7 +53,11 @@ router.post('/login', (req, res) => {
     }
 
     const token = jwt.sign(
-      { id: user.id, role: user.role, email: user.email },
+      {
+        id: user.id,
+        role: user.role,
+        email: user.email
+      },
       SECRET,
       { expiresIn: '24h' }
     );
@@ -62,7 +71,7 @@ router.post('/login', (req, res) => {
     });
 
   } catch (err) {
-    console.error("LOGIN ERROR:", err);
+    console.error("❌ LOGIN ERROR:", err);
 
     return res.status(500).json({
       success: false,
@@ -70,28 +79,79 @@ router.post('/login', (req, res) => {
     });
   }
 });
-// GET /api/auth/me
+
+
+// ======================
+// ME
+// ======================
 router.get('/me', authenticate, (req, res) => {
   const { password: _, ...userSafe } = req.user;
   res.json(userSafe);
 });
 
-// POST /api/auth/logout
+
+// ======================
+// LOGOUT
+// ======================
 router.post('/logout', authenticate, (req, res) => {
-  res.json({ message: 'Déconnexion réussie' });
+  res.json({
+    success: true,
+    message: 'Déconnexion réussie'
+  });
 });
 
-// POST /api/auth/change-password
+
+// ======================
+// CHANGE PASSWORD (FIX IMPORTANT)
+// ======================
 router.post('/change-password', authenticate, (req, res) => {
-  const { ancien_password, nouveau_password } = req.body;
-  if (!ancien_password || !nouveau_password) return res.status(400).json({ error: 'Champs requis' });
+  try {
+    const ancien_password = String(req.body.ancien_password || '');
+    const nouveau_password = String(req.body.nouveau_password || '');
 
-  const valid = bcrypt.compareSync(ancien_password, req.user.password);
-  if (!valid) return res.status(400).json({ error: 'Ancien mot de passe incorrect' });
+    if (!ancien_password || !nouveau_password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Champs requis'
+      });
+    }
 
-  const hash = bcrypt.hashSync(nouveau_password, 10);
-  getDb().prepare('UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(hash, req.user.id);
-  res.json({ message: 'Mot de passe modifié' });
+    const db = getDb();
+
+    const user = db
+      .prepare('SELECT * FROM users WHERE id = ?')
+      .get(req.user.id);
+
+    const valid = bcrypt.compareSync(ancien_password, user.password);
+
+    if (!valid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ancien mot de passe incorrect'
+      });
+    }
+
+    const hash = bcrypt.hashSync(nouveau_password, 10);
+
+    db.prepare(`
+      UPDATE users
+      SET password = ?, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ?
+    `).run(hash, req.user.id);
+
+    res.json({
+      success: true,
+      message: 'Mot de passe modifié'
+    });
+
+  } catch (err) {
+    console.error("CHANGE PASSWORD ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur'
+    });
+  }
 });
 
 module.exports = router;

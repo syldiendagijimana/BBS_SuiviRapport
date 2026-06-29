@@ -3,7 +3,8 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // API BASE URL
-const API_URL = "http://10.139.38.120:3000/api";
+//const API_URL = "http://10.241.220.120:3000/api";
+const API_URL = "https://bbs-suivirapport-1.onrender.com/api";
 
 // Axios instance
 const api = axios.create({
@@ -11,41 +12,60 @@ const api = axios.create({
   timeout: 15000,
   headers: {
     Accept: 'application/json',
+    'Content-Type': 'application/json'
   },
 });
-
 // ======================
 // TOKEN INTERCEPTOR
 // ======================
 api.interceptors.request.use(async (config) => {
+  console.log("➡️ REQUEST:", config.url);
+  console.log("➡️ DATA:", config.data);
+
   const token = await AsyncStorage.getItem('bbs_token');
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
   return config;
 });
-
 // ======================
 // RESPONSE INTERCEPTOR
 // ======================
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+
+    console.log('========== API ERROR ==========');
+    console.log('STATUS :', error.response?.status);
+    console.log('DATA :', error.response?.data);
+    console.log('URL :', error.config?.url);
+    console.log('REQUEST :', error.config?.data);
+    console.log('===============================');
+
     const msg =
       error.response?.data?.error ||
       error.message ||
       'Erreur réseau';
+
     return Promise.reject(new Error(msg));
   }
 );
-
 // ======================
 // AUTH API
 // ======================
 export const authAPI = {
-  login: (email, password) => api.post('/auth/login', { email, password }),
+ login: (email, password) =>
+   api.post('/auth/login', {
+     email: String(email).trim(),
+     password: String(password).trim(),
+   }),
+
   me: () => api.get('/auth/me'),
+
   logout: () => api.post('/auth/logout'),
+
   changePassword: (data) => api.post('/auth/change-password', data),
 };
 

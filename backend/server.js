@@ -1,5 +1,4 @@
 require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
@@ -7,49 +6,29 @@ const fs = require('fs');
 
 const app = express();
 
-// =========================
-// CREATE UPLOADS FOLDER
-// =========================
+// ===== CORS (IMPORTANT pour mobile) =====
+app.use(cors({
+  origin: '*',
+  methods: ['GET','POST','PUT','DELETE','PATCH','OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// ===== BODY PARSER (IMPORTANT LOGIN 400) =====
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ===== UPLOADS =====
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
-
-// =========================
-// MIDDLEWARE (CRITIQUE ORDER)
-// =========================
-
-// 1. CORS (FIRST)
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// 2. BODY PARSER (IMPORTANT)
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-
-// 3. STATIC FILES
 app.use('/uploads', express.static(uploadsDir));
 
-// =========================
-// DEBUG MIDDLEWARE (TEMP - REMOVE LATER)
-// =========================
-app.use((req, res, next) => {
-  console.log(`➡️ ${req.method} ${req.url}`);
-  next();
-});
-
-// =========================
-// INIT DB
-// =========================
+// ===== DATABASE =====
 const { getDb } = require('./db/database');
 getDb();
 
-// =========================
-// ROUTES
-// =========================
+// ===== ROUTES =====
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/techniciens', require('./routes/techniciens'));
@@ -57,49 +36,27 @@ app.use('/api/rapports', require('./routes/rapports'));
 app.use('/api/incidents', require('./routes/incidents'));
 app.use('/api/reseau', require('./routes/reseau'));
 app.use('/api/stats', require('./routes/statistiques'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/notifications', require('./routes/notifications').router);
 
-const messagesRoutes = require('./routes/messages');
-app.use('/api/messages', messagesRoutes);
-
-const notificationsRoutes = require('./routes/notifications');
-app.use('/api/notifications', notificationsRoutes.router);
-
-// =========================
-// HEALTH CHECK (RENDER)
-// =========================
+// ===== HEALTH CHECK =====
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'OK',
-    version: '1.0.0',
-    service: 'BBS API'
+    service: 'BBS API',
+    db: 'SQLite',
+    time: new Date()
   });
 });
 
-// =========================
-// 404 HANDLER
-// =========================
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.path
-  });
-});
-
-// =========================
-// ERROR HANDLER
-// =========================
+// ===== ERROR HANDLER =====
 app.use((err, req, res, next) => {
-  console.error('🔥 SERVER ERROR:', err);
-  res.status(500).json({
-    error: 'Erreur serveur interne'
-  });
+  console.error("❌ SERVER ERROR:", err);
+  res.status(500).json({ error: 'Erreur serveur interne' });
 });
 
-// =========================
-// START SERVER (RENDER SAFE)
-// =========================
+// ===== START SERVER =====
 const PORT = process.env.PORT || 3000;
-
 app.listen(PORT, () => {
-  console.log(`🚀 BBS API running on port ${PORT}`);
+  console.log(`🚀 BBS API démarrée sur port ${PORT}`);
 });
